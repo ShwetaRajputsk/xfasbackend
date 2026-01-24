@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: xfas-logistics-backend
+    env: python
+    plan: free
+    buildCommand: python3.11 --version && python3.11 -m pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: xfas_logistics
+      - key: CORS_ORIGINS
+        value: https://xfas.codezora.com,http://localhost:3000
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: RAZORPAY_KEY_ID
+        value: rzp_test_RzOVYKxNXN9nXV
+      - key: RAZORPAY_KEY_SECRET
+        value: e6YqxlgewImF6fhBhTFgEqbg
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: DEBUG
+        value: "False"
+      - key: ENVIRONMENT
+        value: production

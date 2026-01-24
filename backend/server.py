@@ -1,0 +1,200 @@
+# Suppress bcrypt version warning
+import warnings
+warnings.filterwarnings("ignore", message=".*trapped.*error reading bcrypt version.*", category=UserWarning, module="passlib.handlers.bcrypt")
+
+from fastapi import FastAPI, APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+import logging
+from pydantic import BaseModel, Field
+from typing import List
+import uuid
+from datetime import datetime
+
+# Import centralized configuration
+from config import config
+
+# Import route modules
+from routes.auth import router as auth_router
+from routes.quotes import router as quotes_router
+from routes.shipments import router as shipments_router
+from routes.booking import router as booking_router
+from routes.tracking import router as tracking_router
+from routes.dashboard import router as dashboard_router
+from routes.admin import router as admin_router
+from routes.blog import router as blog_router
+from routes.payment import router as payment_router
+from routes.payments import router as payments_router
+from routes.profile import router as profile_router
+from routes.orders import router as orders_router
+from routes.address_book import router as address_book_router
+from routes.razorpay_routes import router as razorpay_router
+
+# Configure logging using config
+logging.basicConfig(
+    level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
+    format=config.LOG_FORMAT
+)
+logger = logging.getLogger(__name__)
+
+# Print configuration on startup
+if config.DEBUG:
+    config.print_config()
+
+# Initialize MongoDB client (will be created on first use)
+client = None
+db = None
+
+def create_database_connection():
+    """Create database connection, creating it if needed"""
+    global client, db
+    
+    if client is None:
+        try:
+            client = AsyncIOMotorClient(
+                config.get_database_url(), 
+                serverSelectionTimeoutMS=config.MONGO_SERVER_SELECTION_TIMEOUT_MS,
+                connectTimeoutMS=config.MONGO_CONNECT_TIMEOUT_MS,
+                socketTimeoutMS=config.MONGO_SOCKET_TIMEOUT_MS,
+                maxPoolSize=config.MONGO_MAX_POOL_SIZE,
+                retryWrites=True
+            )
+            db = client[config.DB_NAME]
+            logger.info("MongoDB client created successfully")
+        except Exception as e:
+            logger.error(f"Failed to create MongoDB client: {e}")
+            client = None
+            db = None
+    
+    return db
+
+# Create the main app
+app = FastAPI(
+    title="XFas Logistics API",
+    description="Multi-channel parcel delivery platform API",
+    version=config.API_VERSION
+)
+
+# Create a router with the configured API prefix
+api_router = APIRouter(prefix=config.API_PREFIX)
+
+# Database dependency
+async def get_database() -> AsyncIOMotorDatabase:
+    database = create_database_connection()
+    if database is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    return database
+
+# Define Models (legacy)
+class StatusCheck(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_name: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class StatusCheckCreate(BaseModel):
+    client_name: str
+
+# Legacy routes
+@api_router.get("/")
+async def root():
+    return {
+        "message": "XFas Logistics API",
+        "version": config.API_VERSION,
+        "status": "operational"
+    }
+
+@api_router.post("/status", response_model=StatusCheck)
+async def create_status_check(input: StatusCheckCreate):
+    status_dict = input.dict()
+    status_obj = StatusCheck(**status_dict)
+    _ = await db.status_checks.insert_one(status_obj.dict())
+    return status_obj
+
+@api_router.get("/status", response_model=List[StatusCheck])
+async def get_status_checks():
+    status_checks = await db.status_checks.find().to_list(1000)
+    return [StatusCheck(**status_check) for status_check in status_checks]
+
+# Health check endpoint
+@api_router.get("/health")
+async def health_check():
+    try:
+        # Create database connection
+        database = create_database_connection()
+        if database is None:
+            return {
+                "status": "unhealthy", 
+                "database": "not_initialized",
+                "error": "Database client not initialized",
+                "timestamp": datetime.utcnow()
+            }
+        
+        # Test database connection
+        await database.command("ping")
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.utcnow()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.utcnow()
+        }
+
+# Include all routers under the /api prefix
+api_router.include_router(auth_router)
+api_router.include_router(profile_router)
+api_router.include_router(quotes_router)
+api_router.include_router(shipments_router)
+api_router.include_router(booking_router)
+api_router.include_router(tracking_router)
+api_router.include_router(dashboard_router)
+api_router.include_router(admin_router)
+api_router.include_router(blog_router)
+api_router.include_router(payment_router)
+api_router.include_router(payments_router)
+api_router.include_router(orders_router)
+api_router.include_router(address_book_router)
+api_router.include_router(razorpay_router)
+
+# Include the main API router in the app
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=config.CORS_ALLOW_CREDENTIALS,
+    allow_origins=config.CORS_ORIGINS,
+    allow_methods=config.CORS_ALLOW_METHODS if config.CORS_ALLOW_METHODS != ['*'] else ["*"],
+    allow_headers=config.CORS_ALLOW_HEADERS if config.CORS_ALLOW_HEADERS != ['*'] else ["*"],
+)
+
+# Filter out bcrypt warning from passlib
+class BcryptWarningFilter(logging.Filter):
+    def filter(self, record):
+        return not (record.name == 'passlib.handlers.bcrypt' and 'error reading bcrypt version' in record.getMessage())
+
+# Apply filter to root logger
+logging.getLogger('passlib.handlers.bcrypt').addFilter(BcryptWarningFilter())
+logging.getLogger('passlib.handlers.bcrypt').setLevel(logging.ERROR)
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    global client
+    if client is not None:
+        client.close()
+
+
+# Main entry point for running the server
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "server:app",
+        host=config.SERVER_HOST,
+        port=config.SERVER_PORT,
+        reload=config.DEBUG,
+        log_level=config.LOG_LEVEL.lower()
+    )
