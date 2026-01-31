@@ -133,7 +133,7 @@ class OTPService:
     
     async def send_email_otp(self, email: str, otp_code: str, purpose: str) -> bool:
         """
-        Send OTP via email.
+        Send OTP via email using the enhanced email service.
         
         Args:
             email: Recipient email address
@@ -144,79 +144,17 @@ class OTPService:
             Boolean indicating success
         """
         try:
-            # Email configuration (you should set these in environment variables)
-            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-            smtp_port = int(os.getenv('SMTP_PORT', '587'))
-            smtp_user = os.getenv('SMTP_USER')
-            smtp_password = os.getenv('SMTP_PASSWORD')
-            from_email = os.getenv('FROM_EMAIL', smtp_user)
+            from services.email_service import email_service
             
-            if not smtp_user or not smtp_password:
-                logger.error("SMTP credentials not configured")
+            # Send OTP using the enhanced email service
+            result = await email_service.send_otp_email(email, otp_code, purpose)
+            
+            if result['success']:
+                logger.info(f"OTP email sent successfully to {email}")
+                return True
+            else:
+                logger.error(f"Failed to send OTP email to {email}: {result.get('error', 'Unknown error')}")
                 return False
-            
-            # Create message
-            msg = MIMEMultipart()
-            msg['From'] = from_email
-            msg['To'] = email
-            msg['Subject'] = f"XFas Logistics - OTP Verification ({purpose.replace('_', ' ').title()})"
-            
-            # Email body
-            purpose_text = {
-                'registration': 'complete your registration',
-                'login': 'log in to your account',
-                'verify_email': 'verify your email address',
-                'verify_phone': 'verify your phone number'
-            }.get(purpose, 'verify your identity')
-            
-            body = f"""
-            <html>
-            <head>
-                <style>
-                    .container {{ font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; }}
-                    .header {{ background-color: #f97316; color: white; padding: 20px; text-align: center; }}
-                    .content {{ padding: 20px; background-color: #f9f9f9; }}
-                    .otp-box {{ background-color: #fff; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 2px dashed #f97316; }}
-                    .otp-code {{ font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #f97316; }}
-                    .footer {{ background-color: #374151; color: white; padding: 15px; text-align: center; font-size: 12px; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h2>XFas Logistics</h2>
-                        <p>Your OTP Verification Code</p>
-                    </div>
-                    <div class="content">
-                        <p>Hello,</p>
-                        <p>You requested an OTP to {purpose_text}. Please use the code below:</p>
-                        <div class="otp-box">
-                            <div class="otp-code">{otp_code}</div>
-                        </div>
-                        <p><strong>This code will expire in {self.otp_expiry_minutes} minutes.</strong></p>
-                        <p>If you didn't request this code, please ignore this email.</p>
-                    </div>
-                    <div class="footer">
-                        <p>&copy; 2024 XFas Logistics. All rights reserved.</p>
-                        <p>This is an automated message, please do not reply to this email.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-            
-            msg.attach(MIMEText(body, 'html'))
-            
-            # Send email
-            server = smtplib.SMTP(smtp_host, smtp_port)
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            text = msg.as_string()
-            server.sendmail(from_email, email, text)
-            server.quit()
-            
-            logger.info(f"OTP email sent successfully to {email}")
-            return True
             
         except Exception as e:
             logger.error(f"Failed to send OTP email: {str(e)}")

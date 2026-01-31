@@ -287,23 +287,35 @@ class NotificationService:
         return results
     
     async def _send_email(self, to_email: str, template: NotificationTemplate, data: Dict[str, Any]) -> bool:
-        """Send email notification (mock implementation)."""
+        """Send email notification using the enhanced email service."""
         
         try:
-            template_content = self.templates[template]
-            subject = template_content["email_subject"].format(**data)
-            body = template_content["email_body"].format(**data)
+            from services.email_service import email_service
             
-            # Mock email sending - replace with actual email service
-            logger.info(f"Sending email to {to_email}")
-            logger.info(f"Subject: {subject}")
-            logger.info(f"Body: {body[:100]}...")  # Log first 100 chars
+            # Determine which email to send based on template
+            if template == NotificationTemplate.BOOKING_CONFIRMATION:
+                result = await email_service.send_booking_confirmation_email(to_email, data)
+            elif template == NotificationTemplate.STATUS_UPDATE:
+                result = await email_service.send_status_update_email(to_email, data)
+            else:
+                # For other templates, use the generic email method
+                template_content = self.templates[template]
+                subject = template_content["email_subject"].format(**data)
+                body = template_content["email_body"].format(**data)
+                
+                result = await email_service.send_email(
+                    to_email=to_email,
+                    subject=subject,
+                    body="",  # Plain text version can be empty since we have HTML
+                    html_body=body
+                )
             
-            # TODO: Integrate with actual email service (SendGrid, SES, etc.)
-            # Example:
-            # await email_client.send(to=to_email, subject=subject, html=body)
-            
-            return True
+            if result['success']:
+                logger.info(f"Email notification sent successfully to {to_email}")
+                return True
+            else:
+                logger.error(f"Failed to send email notification to {to_email}: {result.get('error', 'Unknown error')}")
+                return False
             
         except Exception as e:
             logger.error(f"Failed to send email to {to_email}: {str(e)}")

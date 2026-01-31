@@ -30,6 +30,7 @@ from routes.profile import router as profile_router
 from routes.orders import router as orders_router
 from routes.address_book import router as address_book_router
 from routes.razorpay_routes import router as razorpay_router
+from routes.email_test import router as email_test_router
 
 # Configure logging using config
 logging.basicConfig(
@@ -160,6 +161,7 @@ api_router.include_router(payments_router)
 api_router.include_router(orders_router)
 api_router.include_router(address_book_router)
 api_router.include_router(razorpay_router)
+api_router.include_router(email_test_router)
 
 # Include the main API router in the app
 app.include_router(api_router)

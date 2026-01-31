@@ -62,11 +62,21 @@ class Config:
     AWS_REGION: str = os.environ.get('AWS_REGION', 'us-east-1')
     
     # ==================== Email Configuration ====================
-    SMTP_HOST: str = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+    SMTP_HOST: str = os.environ.get('SMTP_HOST', 'smtppro.zoho.com')
     SMTP_PORT: int = int(os.environ.get('SMTP_PORT', '587'))
-    SMTP_USERNAME: str = os.environ.get('SMTP_USERNAME', '')
+    SMTP_USERNAME: str = os.environ.get('SMTP_USER', '')
     SMTP_PASSWORD: str = os.environ.get('SMTP_PASSWORD', '')
     SMTP_USE_TLS: bool = os.environ.get('SMTP_USE_TLS', 'True').lower() == 'true'
+    FROM_EMAIL: str = os.environ.get('FROM_EMAIL', '')
+    
+    # Email Server Configuration (Zoho Mail)
+    IMAP_HOST: str = os.environ.get('IMAP_HOST', 'imappro.zoho.com')
+    IMAP_PORT: int = int(os.environ.get('IMAP_PORT', '993'))
+    POP_HOST: str = os.environ.get('POP_HOST', 'poppro.zoho.com')
+    POP_PORT: int = int(os.environ.get('POP_PORT', '995'))
+    
+    # Email Authentication
+    REQUIRE_EMAIL_AUTH: bool = os.environ.get('REQUIRE_EMAIL_AUTH', 'True').lower() == 'true'
     
     # ==================== Payment Configuration ====================
     STRIPE_SECRET_KEY: str = os.environ.get('STRIPE_SECRET_KEY', '')
