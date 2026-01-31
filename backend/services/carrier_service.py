@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional
 import httpx
 import asyncio
+import math
 from datetime import datetime
 
 from models.quote import CarrierQuote, QuoteRequest
@@ -151,9 +152,11 @@ class CarrierService:
             # Calculate volumetric weight if dimensions are provided
             if request.length and request.width and request.height:
                 volumetric_weight = (request.length * request.width * request.height) / 5000  # cm³ to kg
+                volumetric_weight = math.ceil(volumetric_weight)  # Round up to next whole number
                 chargeable_weight = max(chargeable_weight, volumetric_weight)
-                print(f"✅ Volumetric weight calculation: {request.length}x{request.width}x{request.height} = {volumetric_weight:.2f}kg")
-                print(f"✅ Chargeable weight: {chargeable_weight:.2f}kg (higher of {request.weight}kg actual vs {volumetric_weight:.2f}kg volumetric)")
+                chargeable_weight = math.ceil(chargeable_weight)  # Round up to next whole number
+                print(f"✅ Volumetric weight calculation: {request.length}x{request.width}x{request.height} = {volumetric_weight}kg (rounded up)")
+                print(f"✅ Chargeable weight: {chargeable_weight}kg (higher of {request.weight}kg actual vs {volumetric_weight}kg volumetric)")
             else:
                 print(f"⚠️  No dimensions provided, using actual weight: {chargeable_weight}kg")
             
@@ -174,10 +177,12 @@ class CarrierService:
                     volumetric_weight = None
                     if request.length and request.width and request.height:
                         volumetric_weight = (request.length * request.width * request.height) / 5000
+                        volumetric_weight = math.ceil(volumetric_weight)  # Round up to next whole number
                     
                     # Determine chargeable weight (higher of actual or volumetric)
                     actual_weight = request.weight
                     chargeable_weight = max(actual_weight, volumetric_weight) if volumetric_weight else actual_weight
+                    chargeable_weight = math.ceil(chargeable_weight)  # Round up to next whole number
                     
                     print(f"💰 Quote weight details: actual={actual_weight}kg, volumetric={volumetric_weight}kg, chargeable={chargeable_weight}kg")
                     

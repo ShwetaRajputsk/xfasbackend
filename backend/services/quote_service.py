@@ -1,5 +1,6 @@
 from typing import List, Optional
 import asyncio
+import math
 from datetime import datetime, timedelta
 import random
 
@@ -63,8 +64,10 @@ class QuoteService:
         # Volumetric weight calculation
         if request.length and request.width and request.height:
             volumetric_weight = (request.length * request.width * request.height) / 5000  # cm³ to kg
+            volumetric_weight = math.ceil(volumetric_weight)  # Round up to next whole number
         
         chargeable_weight = max(actual_weight, volumetric_weight) if volumetric_weight > 0 else actual_weight
+        chargeable_weight = math.ceil(chargeable_weight)  # Round up to next whole number
         
         # Base rate calculation (mock logic)
         base_rate = self._calculate_base_rate(carrier_name, request)
@@ -129,6 +132,7 @@ class QuoteService:
         # Volumetric weight calculation
         if request.length and request.width and request.height:
             volumetric_weight = (request.length * request.width * request.height) / 5000  # cm³ to kg
+            volumetric_weight = math.ceil(volumetric_weight)  # Round up to next whole number
             weight = max(weight, volumetric_weight)
         
         base_rate = weight * base_rate_per_kg
